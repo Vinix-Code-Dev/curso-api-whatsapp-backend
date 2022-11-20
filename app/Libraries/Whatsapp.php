@@ -49,6 +49,17 @@ class Whatsapp
         return null;
     }
 
+    public function loadTemplateByName($name, $language) {
+        $templates = $this->loadTemplates();
+        foreach ($templates['data'] as $template) {
+            if ($template['name'] == $name && $template['language'] == $language) {
+                return $template;
+            }
+        }
+
+        return null;
+    }
+
     public function loadTemplates() {
         return Http::withToken($this->accessToken)->get($this->baseUrl . '/' . $this->wabaId . '/message_templates?limit=250')->throw()->json();
     }

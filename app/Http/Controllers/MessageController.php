@@ -299,6 +299,22 @@ class MessageController extends Controller
             $phoneId = env('WHATSAPPI_API_PHONE_ID');
             $version = 'v15.0';
 
+            $wp = new Whatsapp();
+            $templateName = $input['template_name'];
+            $templateLang = $input['template_language'];
+            $template = $wp->loadTemplateByName($templateName, $templateLang);
+
+            if (!$template) {
+                throw new Exception("Invalid template.");
+            }
+
+            $templateBody = '';
+            foreach ($template['components'] as $component) {
+                if ($component['type'] == 'BODY') {
+                    $templateBody = $component['text'];
+                }
+            }
+
             $payload = [
                 'messaging_product' => 'whatsapp',
                 'type' => 'template',
@@ -310,6 +326,7 @@ class MessageController extends Controller
                 ]
             ];
 
+            $messageData = [];
             if (!empty($input['header_type']) && !empty($input['header_url'])) {
                 $type = strtolower($input['header_type']);
                 $payload['template']['components'][] = [
@@ -321,31 +338,47 @@ class MessageController extends Controller
                         ]
                     ]],
                 ];
+                $messageData = [
+                    'header_type' => $input['header_type'],
+                    'header_url' => $input['header_url'],
+                ];
             }
 
+            $body = $templateBody;
             if (!empty($input['body_placeholders'])) {
-                $body = [];
-                foreach ($input['body_placeholders'] as $placeholder) {
-                    $body[] = ['type' => 'text', 'text' => $placeholder];
+                $bodyParams = [];
+                foreach ($input['body_placeholders'] as $key => $placeholder) {
+                    $bodyParams[] = ['type' => 'text', 'text' => $placeholder];
+                    $body = str_replace('{{' . ($key + 1) . '}}', $placeholder, $body);
                 }
                 $payload['template']['components'][] = [
                     'type' => 'body',
-                    'parameters' => $body,
+                    'parameters' => $bodyParams,
                 ];
             }
 
             $recipients = explode("\n", $input['recipients']);
+            $errors = [];
 
             foreach ($recipients as $recipient) {
-                $phone = (int) filter_var($recipient, FILTER_SANITIZE_NUMBER_INT);  
-                $payload['to'] = $phone; 
+                $phone = (int) filter_var($recipient, FILTER_SANITIZE_NUMBER_INT);
+                $payload['to'] = $phone;
+                try {
+                    $request = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
+
+                    $message = $this->_saveMessage(
+                        $body,
+                        'template',
+                        $request["contacts"][0]["wa_id"],
+                        $request["messages"][0]["id"],
+                        null,
+                        null,
+                        !empty($messageData) ? serialize($messageData) : null,
+                    );
+                } catch (Exception $e) {
+                    $errors[] = $e->getMessage();
+                }
             }
-            
-
-            $message = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
-
-            // $wp = new Whatsapp();
-            // $message = $wp->sendText('14842918777', 'Is this working?');
 
             return response()->json([
                 'success' => true,

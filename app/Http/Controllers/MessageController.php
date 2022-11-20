@@ -95,6 +95,13 @@ class MessageController extends Controller
                 ->orderBy('created_at')
                 ->get();
 
+            foreach ($messages as $key => $message) {
+                if ($message->type == 'template') {
+                    $message->data = unserialize($message->data);
+                }
+                $messages[$key] = $message;
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $messages,
@@ -206,6 +213,11 @@ class MessageController extends Controller
                 if (!empty($wam->id)) {
                     $wam->status = $status;
                     $wam->save();
+
+                    if ($wam->type == 'template') {
+                        $wam->data = unserialize($wam->data);
+                    }
+
                     Webhook::dispatch($wam, true);
                 }
             } else if (!empty($value['messages'])) { // Message
@@ -373,7 +385,8 @@ class MessageController extends Controller
                         $request["messages"][0]["id"],
                         null,
                         null,
-                        !empty($messageData) ? serialize($messageData) : null,
+                        !empty($messageData) ? serialize($messageData) : '',
+                        true,
                     );
                 } catch (Exception $e) {
                     $errors[] = $e->getMessage();
@@ -392,11 +405,11 @@ class MessageController extends Controller
         }
     }
 
-    private function _saveMessage($message, $messageType, $waId, $wamId, $timestamp = null, $caption = null, $data = '')
+    private function _saveMessage($message, $messageType, $waId, $wamId, $timestamp = null, $caption = null, $data = '', $outgoing = false)
     {
         $wam = new Message();
         $wam->body = $message;
-        $wam->outgoing = false;
+        $wam->outgoing = $outgoing;
         $wam->type = $messageType;
         $wam->wa_id = $waId;
         $wam->wam_id = $wamId;

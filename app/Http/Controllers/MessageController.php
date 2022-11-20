@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\Webhook;
+use App\Libraries\Whatsapp;
 use App\Models\Message;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use PhpParser\Node\Expr;
 
 class MessageController extends Controller
 {
@@ -20,7 +23,6 @@ class MessageController extends Controller
     {
         try {
             $messages = DB::table('messages', 'm')
-                ->select()
                 ->whereRaw('m.id IN (SELECT MAX(id) FROM messages m2 GROUP BY wa_id)')
                 ->orderByDesc('m.id')
                 ->get();
@@ -38,16 +40,6 @@ class MessageController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
      * Store a newly created resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -55,7 +47,38 @@ class MessageController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        try {
+
+            $request->validate([
+                'wa_id' => ['required', 'max:20'],
+                'body' => ['required', 'string'],
+            ]);
+
+            $input = $request->all();
+            $wp = new Whatsapp();
+            $response = $wp->sendText($input['wa_id'], $input['body']);
+
+            $message = new Message();
+            $message->wa_id = $input['wa_id'];
+            $message->wam_id = $response["messages"][0]["id"];
+            $message->type = 'text';
+            $message->outgoing = true;
+            $message->body = $input['body'];
+            $message->status = 'sent';
+            $message->caption = '';
+            $message->data = '';
+            $message->save();
+
+            return response()->json([
+                'success' => true,
+                'data' => $message,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success'  => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -69,7 +92,7 @@ class MessageController extends Controller
         try {
             $messages = DB::table('messages', 'm')
                 ->where('wa_id', $waId)
-                ->orderByDesc('created_at')
+                ->orderBy('created_at')
                 ->get();
 
             return response()->json([
@@ -82,6 +105,18 @@ class MessageController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Message  $message
+     * @return \Illuminate\Http\Response
+     */
+    public function update(Request $request, Message $message)
+    {
+        //
     }
 
     /**
@@ -98,22 +133,25 @@ class MessageController extends Controller
     public function sendMessages()
     {
         try {
-            $token = env('WHATSAPP_API_TOKEN');
-            $phoneId = env('WHATSAPPI_API_PHONE_ID');
-            $version = 'v15.0';
-            $payload = [
-                'messaging_product' => 'whatsapp',
-                'to' => '14842918777',
-                'type' => 'template',
-                "template" => [
-                    "name" => "hello_world",
-                    "language" => [
-                        "code" => "en_US"
-                    ]
-                ]
-            ];
+            // $token = env('WHATSAPP_API_TOKEN');
+            // $phoneId = env('WHATSAPPI_API_PHONE_ID');
+            // $version = 'v15.0';
+            // $payload = [
+            //     'messaging_product' => 'whatsapp',
+            //     'to' => '14842918777',
+            //     'type' => 'template',
+            //     "template" => [
+            //         "name" => "hello_world",
+            //         "language" => [
+            //             "code" => "en_US"
+            //         ]
+            //     ]
+            // ];
 
-            $message = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
+            // $message = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
+
+            $wp = new Whatsapp();
+            $message = $wp->sendText('14842918777', 'Is this working?');
 
             return response()->json([
                 'success' => true,
@@ -130,7 +168,7 @@ class MessageController extends Controller
     public function verifyWebhook(Request $request)
     {
         try {
-            $verifyToken = 'vinixcodewhatsapp456!';
+            $verifyToken = env('WHATSAPP_VERIFY_TOKEN');
             $query = $request->query();
 
             $mode = $query['hub_mode'];
@@ -161,10 +199,21 @@ class MessageController extends Controller
             // Determine what happened...
             $value = $bodyContent['entry'][0]['changes'][0]['value'];
 
-            if (!empty($value['messages'])) { // Message
+            if (!empty($value['statuses'])) {
+                $status = $value['statuses'][0]['status']; // sent, delivered, read, failed
+                $wam = Message::where('wam_id', $value['statuses'][0]['id'])->first();
+
+                if (!empty($wam->id)) {
+                    $wam->status = $status;
+                    $wam->save();
+                    Webhook::dispatch($wam, true);
+                }
+            } else if (!empty($value['messages'])) { // Message
                 $exists = Message::where('wam_id', $value['messages'][0]['id'])->first();
 
                 if (empty($exists->id)) {
+                    $mediaSupported = ['audio', 'document', 'image', 'video', 'sticker'];
+
                     if ($value['messages'][0]['type'] == 'text') {
                         $message = $this->_saveMessage(
                             $value['messages'][0]['text']['body'],
@@ -173,6 +222,29 @@ class MessageController extends Controller
                             $value['messages'][0]['id'],
                             $value['messages'][0]['timestamp']
                         );
+
+                        Webhook::dispatch($message, false);
+                    } else if (in_array($value['messages'][0]['type'], $mediaSupported)) {
+                        $mediaType = $value['messages'][0]['type'];
+                        $mediaId = $value['messages'][0][$mediaType]['id'];
+                        $wp = new Whatsapp();
+                        $file = $wp->downloadMedia($mediaId);
+
+                        $caption = null;
+                        if (!empty($value['messages'][0][$mediaType]['caption'])) {
+                            $caption = $value['messages'][0][$mediaType]['caption'];
+                        }
+
+                        if (!is_null($file)) {
+                            $message = $this->_saveMessage(
+                                'http://localhost:8000/storage/' . $file,
+                                $mediaType,
+                                $value['messages'][0]['from'],
+                                $value['messages'][0]['id'],
+                                $value['messages'][0]['timestamp'],
+                                $caption
+                            );
+                        }
                     } else {
                         $type = $value['messages'][0]['type'];
                         if (!empty($value['messages'][0][$type])) {
@@ -184,9 +256,96 @@ class MessageController extends Controller
                                 $value['messages'][0]['timestamp']
                             );
                         }
+                        Webhook::dispatch($message, false);
                     }
                 }
             }
+
+            return response()->json([
+                'success' => true,
+                'data' => $body,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success'  => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function loadMessageTemplates()
+    {
+        try {
+            $wp = new Whatsapp();
+            $templates = $wp->loadTemplates();
+
+            return response()->json([
+                'success' => true,
+                'data' => $templates['data'],
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success'  => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function sendMessageTemplate(Request $request)
+    {
+        try {
+            $input = $request->all();
+            $token = env('WHATSAPP_API_TOKEN');
+            $phoneId = env('WHATSAPPI_API_PHONE_ID');
+            $version = 'v15.0';
+
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'type' => 'template',
+                "template" => [
+                    "name" => $input['template_name'],
+                    "language" => [
+                        "code" => $input['template_language']
+                    ]
+                ]
+            ];
+
+            if (!empty($input['header_type']) && !empty($input['header_url'])) {
+                $type = strtolower($input['header_type']);
+                $payload['template']['components'][] = [
+                    'type' => 'header',
+                    'parameters' => [[
+                        'type' => $type,
+                        $type => [
+                            'link' => $input['header_url'],
+                        ]
+                    ]],
+                ];
+            }
+
+            if (!empty($input['body_placeholders'])) {
+                $body = [];
+                foreach ($input['body_placeholders'] as $placeholder) {
+                    $body[] = ['type' => 'text', 'text' => $placeholder];
+                }
+                $payload['template']['components'][] = [
+                    'type' => 'body',
+                    'parameters' => $body,
+                ];
+            }
+
+            $recipients = explode("\n", $input['recipients']);
+
+            foreach ($recipients as $recipient) {
+                $phone = (int) filter_var($recipient, FILTER_SANITIZE_NUMBER_INT);  
+                $payload['to'] = $phone; 
+            }
+            
+
+            $message = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
+
+            // $wp = new Whatsapp();
+            // $message = $wp->sendText('14842918777', 'Is this working?');
 
             return response()->json([
                 'success' => true,

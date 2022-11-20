@@ -25,3 +25,5 @@ Route::post('/whatsapp-webhook', [MessageController::class, 'processWebhook']);
 Route::apiResources([
     'messages' => MessageController::class,
 ]);
+Route::get('/message-templates', [MessageController::class, 'loadMessageTemplates']);
+Route::post('/send-message-templates', [MessageController::class, 'sendMessageTemplate']);

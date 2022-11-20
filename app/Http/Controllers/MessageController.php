@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\Webhook;
+use App\Jobs\SendMessage;
 use App\Libraries\Whatsapp;
 use App\Models\Message;
 use Carbon\Carbon;
@@ -307,9 +308,6 @@ class MessageController extends Controller
     {
         try {
             $input = $request->all();
-            $token = env('WHATSAPP_API_TOKEN');
-            $phoneId = env('WHATSAPPI_API_PHONE_ID');
-            $version = 'v15.0';
 
             $wp = new Whatsapp();
             $templateName = $input['template_name'];
@@ -375,27 +373,13 @@ class MessageController extends Controller
             foreach ($recipients as $recipient) {
                 $phone = (int) filter_var($recipient, FILTER_SANITIZE_NUMBER_INT);
                 $payload['to'] = $phone;
-                try {
-                    $request = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
 
-                    $message = $this->_saveMessage(
-                        $body,
-                        'template',
-                        $request["contacts"][0]["wa_id"],
-                        $request["messages"][0]["id"],
-                        null,
-                        null,
-                        !empty($messageData) ? serialize($messageData) : '',
-                        true,
-                    );
-                } catch (Exception $e) {
-                    $errors[] = $e->getMessage();
-                }
+                SendMessage::dispatch($payload, $body, $messageData);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => $message,
+                'data' => count($recipients) . ' messages were enqueued.',
             ], 200);
         } catch (Exception $e) {
             return response()->json([

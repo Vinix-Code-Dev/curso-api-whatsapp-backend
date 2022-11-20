@@ -64,6 +64,10 @@ class Whatsapp
         return Http::withToken($this->accessToken)->get($this->baseUrl . '/' . $this->wabaId . '/message_templates?limit=250')->throw()->json();
     }
 
+    public function genericPayload($payload) {
+        return Http::withToken($this->accessToken)->post($this->baseUrl . '/' . $this->phoneId . '/messages', $payload)->throw()->json();
+    }
+
     /**
      * Convert mime to extension.
      */

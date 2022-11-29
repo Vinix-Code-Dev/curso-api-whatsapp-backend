@@ -214,11 +214,6 @@ class MessageController extends Controller
                 if (!empty($wam->id)) {
                     $wam->status = $status;
                     $wam->save();
-
-                    if ($wam->type == 'template') {
-                        $wam->data = unserialize($wam->data);
-                    }
-
                     Webhook::dispatch($wam, true);
                 }
             } else if (!empty($value['messages'])) { // Message
@@ -368,7 +363,6 @@ class MessageController extends Controller
             }
 
             $recipients = explode("\n", $input['recipients']);
-            $errors = [];
 
             foreach ($recipients as $recipient) {
                 $phone = (int) filter_var($recipient, FILTER_SANITIZE_NUMBER_INT);
@@ -389,11 +383,11 @@ class MessageController extends Controller
         }
     }
 
-    private function _saveMessage($message, $messageType, $waId, $wamId, $timestamp = null, $caption = null, $data = '', $outgoing = false)
+    private function _saveMessage($message, $messageType, $waId, $wamId, $timestamp = null, $caption = null, $data = '')
     {
         $wam = new Message();
         $wam->body = $message;
-        $wam->outgoing = $outgoing;
+        $wam->outgoing = false;
         $wam->type = $messageType;
         $wam->wa_id = $waId;
         $wam->wam_id = $wamId;

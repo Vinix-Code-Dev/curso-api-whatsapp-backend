@@ -19,7 +19,8 @@ class Whatsapp
         $this->wabaId = env('WHATSAPP_BUSINESS_ID');
     }
 
-    public function sendText($to, $text) {
+    public function sendText($to, $text)
+    {
         $payload = [
             'messaging_product' => 'whatsapp',
             'recipient_type' => 'individual',
@@ -34,7 +35,8 @@ class Whatsapp
         return Http::withToken($this->accessToken)->post($this->baseUrl . '/' . $this->phoneId . '/messages', $payload)->throw()->json();
     }
 
-    public function downloadMedia($mediaId) {
+    public function downloadMedia($mediaId)
+    {
         $media = Http::withToken($this->accessToken)->get($this->baseUrl . '/' . $mediaId)->throw()->json();
         if (!empty($media['url'])) {
             $req = Http::withToken($this->accessToken)->get($media['url'])->throw();
@@ -49,7 +51,8 @@ class Whatsapp
         return null;
     }
 
-    public function loadTemplateByName($name, $language) {
+    public function loadTemplateByName($name, $language)
+    {
         $templates = $this->loadTemplates();
         foreach ($templates['data'] as $template) {
             if ($template['name'] == $name && $template['language'] == $language) {
@@ -60,11 +63,44 @@ class Whatsapp
         return null;
     }
 
-    public function loadTemplates() {
+    public function loadTemplates()
+    {
         return Http::withToken($this->accessToken)->get($this->baseUrl . '/' . $this->wabaId . '/message_templates?limit=250')->throw()->json();
     }
 
-    public function genericPayload($payload) {
+    public function genericPayload($payload)
+    {
+        return Http::withToken($this->accessToken)->post($this->baseUrl . '/' . $this->phoneId . '/messages', $payload)->throw()->json();
+    }
+
+    public function sendButton($to, $bodyText, $buttons)
+    {
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $to,
+            'type' => 'interactive',
+            'interactive' => [
+                "type" => "button",
+                "body" => [
+                    "text" => $bodyText,
+                ],
+                'action' => [
+                    'buttons' => []
+                ],
+            ]
+        ];
+
+        foreach ($buttons as $key => $button) {
+            $payload['interactive']['action']['buttons'][] = [
+                'type' => 'reply',
+                'reply' => [
+                    'id' => 'button_' . $key . '_' . time(),
+                    'title' => $button,
+                ]
+            ];
+        }
+
         return Http::withToken($this->accessToken)->post($this->baseUrl . '/' . $this->phoneId . '/messages', $payload)->throw()->json();
     }
 

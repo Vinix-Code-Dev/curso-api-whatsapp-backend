@@ -144,22 +144,72 @@ class MessageController extends Controller
             // $token = env('WHATSAPP_API_TOKEN');
             // $phoneId = env('WHATSAPPI_API_PHONE_ID');
             // $version = 'v15.0';
+            // $buttons = [
+            //     "type" => "button",
+            //     "body" => [
+            //         "text" => 'Hola, soy el bot Juanes!',
+            //     ],
+            //     'action' => [
+            //         'buttons' => [
+            //             [
+            //                 'type' => 'reply',
+            //                 'reply' => [
+            //                     'id' => 'button1_id',
+            //                     'title' => 'Opcion 1',
+            //                 ]
+            //             ],
+            //             [
+            //                 'type' => 'reply',
+            //                 'reply' => [
+            //                     'id' => 'button2_id',
+            //                     'title' => 'Opcion 2',
+            //                 ]
+            //             ]
+            //         ],
+            //     ],
+            // ];
+            // $list = [
+            //     'type' => 'list',
+            //     "body" => [
+            //         "text" => 'Hola, soy el bot Juanes!',
+            //     ],
+            //     'action' => [
+            //         'button' => 'Opciones',
+            //         'sections' => [
+            //             [
+            //                 'title' => 'Seccion 1',
+            //                 'rows' => [
+            //                     [
+            //                         'id' => 'mi_id1',
+            //                         'title' => 'Mi titulo',
+            //                         'description' => 'My description'
+            //                     ],
+            //                     [
+            //                         'id' => 'mi_id2',
+            //                         'title' => 'Mi titulo 2',
+            //                         'description' => 'My description 2'
+            //                     ],
+            //                 ],
+            //             ]
+            //         ],
+            //     ]
+            // ];
             // $payload = [
             //     'messaging_product' => 'whatsapp',
             //     'to' => '14842918777',
-            //     'type' => 'template',
-            //     "template" => [
-            //         "name" => "hello_world",
-            //         "language" => [
-            //             "code" => "en_US"
-            //         ]
-            //     ]
+            //     'type' => 'interactive',
+            //     'interactive' => $list,
             // ];
 
             // $message = Http::withToken($token)->post('https://graph.facebook.com/' . $version . '/' . $phoneId . '/messages', $payload)->throw()->json();
 
+            $buttons = ['Formulario de Registro', 'Horarios', 'Ubicación'];
             $wp = new Whatsapp();
-            $message = $wp->sendText('14842918777', 'Is this working?');
+            $message = $wp->sendButton(
+                '14842918777',
+                'Hola soy Juanes Bot y estoy aquí para ayudarte. Selecciona una de estas opciones.',
+                $buttons
+            );
 
             return response()->json([
                 'success' => true,
@@ -223,8 +273,20 @@ class MessageController extends Controller
                     $mediaSupported = ['audio', 'document', 'image', 'video', 'sticker'];
 
                     if ($value['messages'][0]['type'] == 'text') {
+                        $this->processChatbotMessages($value['messages'][0]['text']['body'], $value['messages'][0]['from']);
+
                         $message = $this->_saveMessage(
                             $value['messages'][0]['text']['body'],
+                            'text',
+                            $value['messages'][0]['from'],
+                            $value['messages'][0]['id'],
+                            $value['messages'][0]['timestamp']
+                        );
+
+                        Webhook::dispatch($message, false);
+                    } else if ($value['messages'][0]['type'] == 'interactive') {
+                        $message = $this->_saveMessage(
+                            $value["messages"][0]["interactive"]["button_reply"]["title"],
                             'text',
                             $value['messages'][0]['from'],
                             $value['messages'][0]['id'],
@@ -279,6 +341,39 @@ class MessageController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function processChatbotMessages($text, $waId)
+    {
+        $text = strtolower($text);
+        $wp = new Whatsapp();
+
+        // $message = Message::where('outgoing', false)->where('wa_id', $waId)->orderByDesc('id')->first();
+
+        // if (!empty($message) && strtolower($message->body) == 'hola') {
+        if ($text == 'menu') {
+            $buttons = ['Formulario', 'Cafes', 'Ubicación'];
+
+            $wp->sendButton(
+                $waId,
+                'Hola soy Juanes Bot y estoy aquí para ayudarte. Selecciona una de estas opciones.',
+                $buttons
+            );
+        } else if ($text == 'cafes') {
+            $response = Http::get('https://api.sampleapis.com/coffee/hot')->throw()->json();
+
+            $body = '';
+            foreach ($response as $item) {
+                $body .= $item['title'] . ', ';
+            }
+
+            $wp->sendText($waId, $body);
+        } else {
+            $wp->sendText($waId, 'No entiendo tu respuesta.');
+        }
+        // } else {
+        //     $wp->sendText($waId, 'No seas descortes y por favor saludame.');
+        // }
     }
 
     public function loadMessageTemplates()

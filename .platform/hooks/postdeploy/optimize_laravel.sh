@@ -13,4 +13,6 @@ php artisan view:cache
 
 php artisan vendor:publish --tag="cors"
 
+sudo php artisan storage:link
+
 # php artisan db:seed --class=SettingTrialConversations

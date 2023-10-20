@@ -8,19 +8,17 @@ use App\Libraries\Whatsapp;
 use App\Models\Message;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use PhpParser\Node\Expr;
 
 class MessageController extends Controller
 {
     /**
      * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(): JsonResponse
     {
         try {
             $messages = DB::table('messages', 'm')
@@ -34,7 +32,7 @@ class MessageController extends Controller
             ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -42,11 +40,8 @@ class MessageController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
 
@@ -61,7 +56,7 @@ class MessageController extends Controller
 
             $message = new Message();
             $message->wa_id = $input['wa_id'];
-            $message->wam_id = $response["messages"][0]["id"];
+            $message->wam_id = $response['messages'][0]['id'];
             $message->type = 'text';
             $message->outgoing = true;
             $message->body = $input['body'];
@@ -76,7 +71,7 @@ class MessageController extends Controller
             ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -86,9 +81,8 @@ class MessageController extends Controller
      * Display the specified resource.
      *
      * @param  \App\Models\Message  $message
-     * @return \Illuminate\Http\Response
      */
-    public function show($waId, Request $request)
+    public function show($waId, Request $request): JsonResponse
     {
         try {
             $messages = DB::table('messages', 'm')
@@ -109,7 +103,7 @@ class MessageController extends Controller
             ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -118,8 +112,6 @@ class MessageController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Message  $message
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, Message $message)
@@ -130,7 +122,6 @@ class MessageController extends Controller
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\Message  $message
      * @return \Illuminate\Http\Response
      */
     public function destroy(Message $message)
@@ -138,7 +129,7 @@ class MessageController extends Controller
         //
     }
 
-    public function sendMessages()
+    public function sendMessages(): JsonResponse
     {
         try {
             // $token = env('WHATSAPP_API_TOKEN');
@@ -167,7 +158,7 @@ class MessageController extends Controller
             ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -192,13 +183,13 @@ class MessageController extends Controller
             throw new Exception('Invalid request');
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
-    public function processWebhook(Request $request)
+    public function processWebhook(Request $request): JsonResponse
     {
         try {
             $bodyContent = json_decode($request->getContent(), true);
@@ -207,16 +198,16 @@ class MessageController extends Controller
             // Determine what happened...
             $value = $bodyContent['entry'][0]['changes'][0]['value'];
 
-            if (!empty($value['statuses'])) {
+            if (! empty($value['statuses'])) {
                 $status = $value['statuses'][0]['status']; // sent, delivered, read, failed
                 $wam = Message::where('wam_id', $value['statuses'][0]['id'])->first();
 
-                if (!empty($wam->id)) {
+                if (! empty($wam->id)) {
                     $wam->status = $status;
                     $wam->save();
                     Webhook::dispatch($wam, true);
                 }
-            } else if (!empty($value['messages'])) { // Message
+            } elseif (! empty($value['messages'])) { // Message
                 $exists = Message::where('wam_id', $value['messages'][0]['id'])->first();
 
                 if (empty($exists->id)) {
@@ -232,18 +223,18 @@ class MessageController extends Controller
                         );
 
                         Webhook::dispatch($message, false);
-                    } else if (in_array($value['messages'][0]['type'], $mediaSupported)) {
+                    } elseif (in_array($value['messages'][0]['type'], $mediaSupported)) {
                         $mediaType = $value['messages'][0]['type'];
                         $mediaId = $value['messages'][0][$mediaType]['id'];
                         $wp = new Whatsapp();
                         $file = $wp->downloadMedia($mediaId);
 
                         $caption = null;
-                        if (!empty($value['messages'][0][$mediaType]['caption'])) {
+                        if (! empty($value['messages'][0][$mediaType]['caption'])) {
                             $caption = $value['messages'][0][$mediaType]['caption'];
                         }
 
-                        if (!is_null($file)) {
+                        if (! is_null($file)) {
                             $message = $this->_saveMessage(
                                 env('APP_URL') . '/storage/' . $file,
                                 $mediaType,
@@ -255,9 +246,9 @@ class MessageController extends Controller
                         }
                     } else {
                         $type = $value['messages'][0]['type'];
-                        if (!empty($value['messages'][0][$type])) {
+                        if (! empty($value['messages'][0][$type])) {
                             $message = $this->_saveMessage(
-                                "($type): \n _" . serialize($value['messages'][0][$type]) . "_",
+                                "($type): \n _".serialize($value['messages'][0][$type]).'_',
                                 'other',
                                 $value['messages'][0]['from'],
                                 $value['messages'][0]['id'],
@@ -275,13 +266,13 @@ class MessageController extends Controller
             ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
-    public function loadMessageTemplates()
+    public function loadMessageTemplates(): JsonResponse
     {
         try {
             $wp = new Whatsapp();
@@ -293,13 +284,13 @@ class MessageController extends Controller
             ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
-    public function sendMessageTemplate(Request $request)
+    public function sendMessageTemplate(Request $request): JsonResponse
     {
         try {
             $input = $request->all();
@@ -309,8 +300,8 @@ class MessageController extends Controller
             $templateLang = $input['template_language'];
             $template = $wp->loadTemplateByName($templateName, $templateLang);
 
-            if (!$template) {
-                throw new Exception("Invalid template.");
+            if (! $template) {
+                throw new Exception('Invalid template.');
             }
 
             $templateBody = '';
@@ -323,16 +314,16 @@ class MessageController extends Controller
             $payload = [
                 'messaging_product' => 'whatsapp',
                 'type' => 'template',
-                "template" => [
-                    "name" => $input['template_name'],
-                    "language" => [
-                        "code" => $input['template_language']
-                    ]
-                ]
+                'template' => [
+                    'name' => $input['template_name'],
+                    'language' => [
+                        'code' => $input['template_language'],
+                    ],
+                ],
             ];
 
             $messageData = [];
-            if (!empty($input['header_type']) && !empty($input['header_url'])) {
+            if (! empty($input['header_type']) && ! empty($input['header_url'])) {
                 $type = strtolower($input['header_type']);
                 $payload['template']['components'][] = [
                     'type' => 'header',
@@ -340,7 +331,7 @@ class MessageController extends Controller
                         'type' => $type,
                         $type => [
                             'link' => $input['header_url'],
-                        ]
+                        ],
                     ]],
                 ];
                 $messageData = [
@@ -350,11 +341,11 @@ class MessageController extends Controller
             }
 
             $body = $templateBody;
-            if (!empty($input['body_placeholders'])) {
+            if (! empty($input['body_placeholders'])) {
                 $bodyParams = [];
                 foreach ($input['body_placeholders'] as $key => $placeholder) {
                     $bodyParams[] = ['type' => 'text', 'text' => $placeholder];
-                    $body = str_replace('{{' . ($key + 1) . '}}', $placeholder, $body);
+                    $body = str_replace('{{'.($key + 1).'}}', $placeholder, $body);
                 }
                 $payload['template']['components'][] = [
                     'type' => 'body',
@@ -373,11 +364,11 @@ class MessageController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => count($recipients) . ' messages were enqueued.',
+                'data' => count($recipients).' messages were enqueued.',
             ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'success'  => false,
+                'success' => false,
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -395,7 +386,7 @@ class MessageController extends Controller
         $wam->caption = $caption;
         $wam->data = $data;
 
-        if (!is_null($timestamp)) {
+        if (! is_null($timestamp)) {
             $wam->created_at = Carbon::createFromTimestamp($timestamp)->toDateTimeString();
             $wam->updated_at = Carbon::createFromTimestamp($timestamp)->toDateTimeString();
         }

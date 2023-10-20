@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use App\Events\Webhook;
 use App\Jobs\SendMessage;
 use App\Libraries\Whatsapp;
@@ -19,7 +20,7 @@ class MessageController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(): JsonResponse
     {
         try {
             $messages = DB::table('messages', 'm')
@@ -44,7 +45,7 @@ class MessageController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
 
@@ -86,7 +87,7 @@ class MessageController extends Controller
      * @param  \App\Models\Message  $message
      * @return \Illuminate\Http\Response
      */
-    public function show($waId, Request $request)
+    public function show($waId, Request $request): JsonResponse
     {
         try {
             $messages = DB::table('messages', 'm')
@@ -133,7 +134,7 @@ class MessageController extends Controller
         //
     }
 
-    public function sendMessages()
+    public function sendMessages(): JsonResponse
     {
         try {
             // $token = env('WHATSAPP_API_TOKEN');
@@ -193,7 +194,7 @@ class MessageController extends Controller
         }
     }
 
-    public function processWebhook(Request $request)
+    public function processWebhook(Request $request): JsonResponse
     {
         try {
             $bodyContent = json_decode($request->getContent(), true);
@@ -276,7 +277,7 @@ class MessageController extends Controller
         }
     }
 
-    public function loadMessageTemplates()
+    public function loadMessageTemplates(): JsonResponse
     {
         try {
             $wp = new Whatsapp();
@@ -294,7 +295,7 @@ class MessageController extends Controller
         }
     }
 
-    public function sendMessageTemplate(Request $request)
+    public function sendMessageTemplate(Request $request): JsonResponse
     {
         try {
             $input = $request->all();

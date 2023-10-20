@@ -39,7 +39,7 @@ class SendMessage implements ShouldQueue
      *
      * @return void
      */
-    public function handle()
+    public function handle(): void
     {
         try {
             $wp = new Whatsapp();

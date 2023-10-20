@@ -32,8 +32,10 @@ class Webhook implements ShouldBroadcast
      *
      * @return \Illuminate\Broadcasting\Channel|array
      */
-    public function broadcastOn()
+    public function broadcastOn(): array
     {
-        return new Channel('webhooks');
+        return [
+            new Channel('webhooks'),
+        ];
     }
 }

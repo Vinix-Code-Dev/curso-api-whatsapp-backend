@@ -8,6 +8,7 @@ use App\Libraries\Whatsapp;
 use App\Models\Message;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -16,10 +17,8 @@ class MessageController extends Controller
 {
     /**
      * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(): JsonResponse
     {
         try {
             $messages = DB::table('messages', 'm')
@@ -41,10 +40,8 @@ class MessageController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     *
-     * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
 
@@ -84,9 +81,8 @@ class MessageController extends Controller
      * Display the specified resource.
      *
      * @param  \App\Models\Message  $message
-     * @return \Illuminate\Http\Response
      */
-    public function show($waId, Request $request)
+    public function show($waId, Request $request): JsonResponse
     {
         try {
             $messages = DB::table('messages', 'm')
@@ -133,7 +129,7 @@ class MessageController extends Controller
         //
     }
 
-    public function sendMessages()
+    public function sendMessages(): JsonResponse
     {
         try {
             // $token = env('WHATSAPP_API_TOKEN');
@@ -193,7 +189,7 @@ class MessageController extends Controller
         }
     }
 
-    public function processWebhook(Request $request)
+    public function processWebhook(Request $request): JsonResponse
     {
         try {
             $bodyContent = json_decode($request->getContent(), true);
@@ -276,7 +272,7 @@ class MessageController extends Controller
         }
     }
 
-    public function loadMessageTemplates()
+    public function loadMessageTemplates(): JsonResponse
     {
         try {
             $wp = new Whatsapp();
@@ -294,7 +290,7 @@ class MessageController extends Controller
         }
     }
 
-    public function sendMessageTemplate(Request $request)
+    public function sendMessageTemplate(Request $request): JsonResponse
     {
         try {
             $input = $request->all();

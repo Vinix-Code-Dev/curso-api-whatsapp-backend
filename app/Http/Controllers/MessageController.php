@@ -17,8 +17,6 @@ class MessageController extends Controller
 {
     /**
      * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
      */
     public function index(): JsonResponse
     {
@@ -42,8 +40,6 @@ class MessageController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     *
-     * @return \Illuminate\Http\Response
      */
     public function store(Request $request): JsonResponse
     {
@@ -85,7 +81,6 @@ class MessageController extends Controller
      * Display the specified resource.
      *
      * @param  \App\Models\Message  $message
-     * @return \Illuminate\Http\Response
      */
     public function show($waId, Request $request): JsonResponse
     {

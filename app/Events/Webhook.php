@@ -34,6 +34,8 @@ class Webhook implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
-        return new Channel('webhooks');
+        return [
+            new Channel('webhooks'),
+        ];
     }
 }

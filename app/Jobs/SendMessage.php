@@ -6,7 +6,6 @@ use App\Libraries\Whatsapp;
 use App\Models\Message;
 use Exception;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -18,7 +17,9 @@ class SendMessage implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $payload;
+
     public $body;
+
     public $messageData;
 
     /**
@@ -48,14 +49,14 @@ class SendMessage implements ShouldQueue
             $wam->body = $this->body;
             $wam->outgoing = true;
             $wam->type = 'template';
-            $wam->wa_id = $request["contacts"][0]["wa_id"];
-            $wam->wam_id = $request["messages"][0]["id"];
+            $wam->wa_id = $request['contacts'][0]['wa_id'];
+            $wam->wam_id = $request['messages'][0]['id'];
             $wam->status = 'sent';
             $wam->caption = '';
             $wam->data = serialize($this->messageData);
             $wam->save();
         } catch (Exception $e) {
-            Log::error('Error sending message: ' . $e->getMessage());
+            Log::error('Error sending message: '.$e->getMessage());
         }
     }
 }
